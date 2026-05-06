@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <title>renz029 | SKULL_MINER: ABSOLUTE</title>
+    <style>
+        :root {
+            --p-color: #bc13fe;
+            --c-color: #00f3ff;
+            --g-color: #ffcc00;
+            --bg: #0d0415;
+            --panel: #0a0a0a;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0; display: flex; height: 100vh; overflow: hidden;
+            background-image: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%);
+            background-size: 100% 4px;
+        }
+
+        /* --- MENÚ DE PAUSA --- */
+        #pause-menu {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .menu-btn {
+            background: transparent;
+            border: 2px solid var(--p-color);
+            color: var(--p-color);
+            padding: 15px 40px;
+            margin: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            letter-spacing: 3px;
+            width: 250px;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+
+        .menu-btn:hover { background: var(--p-color); color: white; }
+        .btn-exit { border-color: #ff003c; color: #ff003c; }
+        .btn-exit:hover { background: #ff003c; color: white; }
+
+        /* --- SECCIÓ ESQUERRA --- */
+        .game-view { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; border-right: 1px solid #1a1a1a; }
+        .shake { animation: shake-anim 0.1s infinite; }
+        @keyframes shake-anim {
+            0% { transform: translate(2px, 1px); }
+            50% { transform: translate(-2px, -1px); }
+            100% { transform: translate(2px, 1px); }
+        }
+
+        .top-nav {
+            width: 90%; display: flex; justify-content: space-between;
+            padding: 25px 0; border-bottom: 1px solid #222;
+            font-size: 11px; letter-spacing: 2px; font-family: monospace; color: #aaa;
+        }
+
+        .score-container { text-align: center; margin-top: 100px; }
+        .data-label { color: #444; letter-spacing: 10px; font-size: 12px; margin-bottom: 15px; }
+        .score-val { font-size: 85px; font-weight: bold; color: var(--c-color); text-shadow: 0 0 25px var(--c-color); }
+
+        .skull-main {
+            margin-top: 60px; font-size: 180px; cursor: pointer; user-select: none;
+            filter: drop-shadow(0 0 40px var(--p-color));
+            transition: transform 0.05s, filter 0.3s;
+        }
+        .skull-main:active { transform: scale(0.9); }
+
+        /* --- SECCIÓ DRETA --- */
+        .sidebar { width: 420px; background: var(--panel); display: flex; flex-direction: column; }
+        .tab-header { display: flex; height: 70px; flex-shrink: 0; }
+        .tab {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 11px; font-weight: bold; letter-spacing: 3px;
+            background: #050505; color: #666; transition: 0.3s;
+        }
+        .tab.active { background: var(--p-color); color: black; }
+        .item-list { flex: 1; padding: 20px; overflow-y: scroll; background: #080808; }
+        .card {
+            background: #111; border: 1px solid #222; padding: 20px; margin-bottom: 15px;
+            border-radius: 6px; display: flex; justify-content: space-between; align-items: center;
+            transition: 0.2s; cursor: pointer;
+        }
+        .card:hover:not(.disabled) { border-color: var(--p-color); background: #151515; }
+        .card.disabled { opacity: 0.6; cursor: not-allowed; }
+        .card.owned { border-color: var(--c-color); }
+        .card-info b { color: var(--p-color); display: block; margin-bottom: 5px; font-family: monospace; }
+        .card-price { color: var(--g-color); font-weight: bold; font-family: monospace; font-size: 15px; }
+
+        .particle { position: absolute; color: var(--c-color); font-weight: bold; pointer-events: none; animation: p-fly 0.6s forwards; }
+        @keyframes p-fly { to { opacity: 0; transform: translateY(-70px); } }
+    </style>
+</head>
+<body>
+
+    <div id="pause-menu">
+        <h1 style="letter-spacing: 15px; color: white;">PAUSED</h1>
+        <button class="menu-btn" onclick="togglePause()">RESUME</button>
+        <button class="menu-btn btn-exit" onclick="window.location.href='index.html'">EXIT</button>
+    </div>
+
+    <div class="game-view" id="main-view">
+        <div class="top-nav">
+            <div>NETWORK: <span style="color:var(--g-color)">CONNECTED</span></div>
+            <div>STRENGTH: <span id="pwr-ui" style="color:white">1</span> [CLCK/S]</div>
+            <div>AUTO: <span id="gps-ui" style="color:white">0</span> [GB/S]</div>
+        </div>
+        <div class="score-container">
+            <div class="data-label">D A T A _ C O L L E C T E D</div>
+            <div class="score-val" id="score-txt">0</div>
+        </div>
+        <div class="skull-main" id="skull">💀</div>
+    </div>
+
+    <div class="sidebar">
+        <div class="tab-header">
+            <div class="tab active" id="btn-hw" onclick="tab('hw')">HARDWARE</div>
+            <div class="tab" id="btn-mod" onclick="tab('mod')">MODULES</div>
+        </div>
+        <div class="item-list" id="items-content"></div>
+    </div>
+
+    <script>
+        let score = 0;
+        let pwr = 1;
+        let gps = 0;
+        let isPaused = false;
+        let currentTab = 'hw';
+        let ownedSkins = ['💀'];
+        let activeSkinIcon = '💀';
+
+        let hardware = [
+            { name: "Overclocked CPU", cost: 15, add: 1, type: 'pwr' },
+            { name: "Neural Link", cost: 200, add: 10, type: 'pwr' },
+            { name: "Basic Botnet", cost: 100, add: 2, type: 'gps' },
+            { name: "Quantum Server", cost: 1500, add: 25, type: 'gps' }
+        ];
+
+        const skins = [
+            { name: "Standard.v1", icon: "💀", cost: 0, color: "#bc13fe" },
+            { name: "Neon_Cyborg", icon: "🤖", cost: 5000, color: "#00f3ff" },
+            { name: "Toxic_Slime", icon: "🤢", cost: 15000, color: "#39ff14" }
+        ];
+
+        function togglePause() {
+            isPaused = !isPaused;
+            document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none';
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === "Escape") togglePause();
+        });
+
+        function saveGame() {
+            const gameData = { score, pwr, gps, hardware, ownedSkins, activeSkinIcon };
+            localStorage.setItem('renz029_miner_save', JSON.stringify(gameData));
+        }
+
+        function loadGame() {
+            const savedData = localStorage.getItem('renz029_miner_save');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                score = data.score; pwr = data.pwr; gps = data.gps;
+                hardware = data.hardware; ownedSkins = data.ownedSkins;
+                activeSkinIcon = data.activeSkinIcon;
+                document.getElementById('skull').innerText = activeSkinIcon;
+            }
+        }
+
+        function tab(t) {
+            currentTab = t;
+            document.getElementById('btn-hw').className = 'tab' + (t==='hw'?' active':'');
+            document.getElementById('btn-mod').className = 'tab' + (t==='mod'?' active':'');
+            render();
+        }
+
+        function render() {
+            document.getElementById('score-txt').innerText = Math.floor(score).toLocaleString();
+            document.getElementById('pwr-ui').innerText = pwr;
+            document.getElementById('gps-ui').innerText = gps;
+            const container = document.getElementById('items-content');
+            container.innerHTML = "";
+
+            if (currentTab === 'hw') {
+                hardware.forEach(item => {
+                    let card = document.createElement('div');
+                    card.className = `card ${score < item.cost ? 'disabled' : ''}`;
+                    card.innerHTML = `<div class="card-info"><b>${item.name}</b><span>+${item.add} ${item.type}</span></div><div class="card-price">${item.cost}</div>`;
+                    card.onclick = () => {
+                        if(!isPaused && score >= item.cost) {
+                            score -= item.cost;
+                            if(item.type==='pwr') pwr+=item.add; else gps+=item.add;
+                            item.cost = Math.floor(item.cost * 1.5);
+                            saveGame(); render();
+                        }
+                    };
+                    container.appendChild(card);
+                });
+            } else {
+                skins.forEach(s => {
+                    let isOwned = ownedSkins.includes(s.icon);
+                    let card = document.createElement('div');
+                    card.className = `card ${(!isOwned && score < s.cost) ? 'disabled' : ''} ${isOwned ? 'owned' : ''}`;
+                    card.innerHTML = `<div class="card-info"><b>${s.name}</b></div><div class="card-price">${isOwned ? s.icon : s.cost}</div>`;
+                    card.onclick = () => {
+                        if (!isPaused) {
+                            if (isOwned) {
+                                activeSkinIcon = s.icon;
+                                document.getElementById('skull').innerText = s.icon;
+                                saveGame();
+                            } else if (score >= s.cost) {
+                                score -= s.cost; ownedSkins.push(s.icon);
+                                saveGame(); render();
+                            }
+                        }
+                    };
+                    container.appendChild(card);
+                });
+            }
+        }
+
+        document.getElementById('skull').onclick = (e) => {
+            if (!isPaused) {
+                score += pwr;
+                document.getElementById('main-view').classList.add('shake');
+                setTimeout(()=>document.getElementById('main-view').classList.remove('shake'), 80);
+                saveGame(); render();
+            }
+        };
+
+        setInterval(() => { if(!isPaused) { score += gps; render(); } }, 1000);
+        window.onload = () => { loadGame(); render(); };
+    </script>
+</body>
+</html>

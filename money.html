@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <title>NEON FORTUNE: High Roller</title>
+    <style>
+        :root {
+            --neon-green: #39ff14;
+            --neon-pink: #ff00ff;
+            --neon-blue: #00f3ff;
+            --gold: #ffcc00;
+            --dark-bg: #0a0a12;
+            --card-bg: #161625;
+            --led-red: #ff003c;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: white;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+            background-image: radial-gradient(circle at top, #1b1b3a 0%, #0a0a12 100%);
+            overflow: hidden; /* Evita scroll mentre juguem */
+        }
+
+        /* --- MENÚ DE PAUSA --- */
+        #pause-menu {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .menu-btn {
+            background: transparent;
+            border: 2px solid var(--neon-blue);
+            color: var(--neon-blue);
+            padding: 15px 40px;
+            margin: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            letter-spacing: 3px;
+            width: 250px;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+
+        .menu-btn:hover { background: var(--neon-blue); color: black; box-shadow: 0 0 20px var(--neon-blue); }
+        .btn-exit { border-color: var(--led-red); color: var(--led-red); }
+        .btn-exit:hover { background: var(--led-red); color: white; box-shadow: 0 0 20px var(--led-red); }
+
+        /* --- GAME CARD ORIGINAL --- */
+        .game-card {
+            width: 400px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5), 0 0 10px var(--neon-blue);
+            overflow: hidden;
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            position: relative;
+        }
+
+        .header {
+            padding: 25px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .balance-label { font-size: 12px; color: var(--neon-blue); letter-spacing: 2px; font-weight: bold; }
+        .balance-amount { font-size: 42px; font-weight: 900; color: white; text-shadow: 0 0 15px var(--neon-blue); margin: 5px 0; }
+
+        .nav { display: flex; background: rgba(0,0,0,0.3); }
+        .nav-btn {
+            flex: 1; padding: 15px; border: none; background: none; color: #888;
+            cursor: pointer; font-weight: bold; font-size: 11px; text-transform: uppercase;
+            transition: 0.3s;
+        }
+        .nav-btn.active { color: var(--neon-pink); border-bottom: 3px solid var(--neon-pink); background: rgba(255,0,255,0.05); }
+
+        .content { padding: 20px; min-height: 400px; }
+        .view { display: none; animation: fadeIn 0.4s; }
+        .active-view { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .clicker-container { text-align: center; padding-top: 40px; }
+        .neon-btn {
+            width: 160px; height: 160px; border-radius: 50%; border: 4px solid var(--neon-green);
+            background: none; color: var(--neon-green); font-size: 20px; font-weight: 900;
+            cursor: pointer; position: relative; box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+            transition: 0.1s;
+        }
+        .neon-btn:hover { background: rgba(57, 255, 20, 0.1); box-shadow: 0 0 40px rgba(57, 255, 20, 0.4); }
+        .neon-btn:active { transform: scale(0.92); box-shadow: 0 0 10px var(--neon-green); }
+
+        .upgrade-card {
+            background: rgba(255,255,255,0.05); border-radius: 12px; padding: 15px;
+            margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
+            border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; cursor: pointer;
+        }
+        .upgrade-card:hover:not(.disabled) { background: rgba(255,255,255,0.1); border-color: var(--neon-blue); }
+        .upgrade-card.disabled { opacity: 0.4; cursor: not-allowed; }
+        .up-info b { display: block; color: var(--neon-blue); font-size: 14px; }
+        .up-info small { color: #aaa; font-size: 11px; }
+        .up-price { color: var(--gold); font-weight: bold; font-family: monospace; font-size: 16px; }
+
+        .slot-machine { display: flex; gap: 10px; justify-content: center; margin: 30px 0; }
+        .slot {
+            width: 70px; height: 100px; background: #000; border: 2px solid var(--neon-pink);
+            border-radius: 10px; font-size: 45px; display: flex; align-items: center;
+            justify-content: center; text-shadow: 0 0 10px var(--neon-pink);
+        }
+        .casino-input {
+            width: 100%; box-sizing: border-box; background: #000; border: 1px solid #444;
+            padding: 12px; color: var(--gold); border-radius: 8px; text-align: center; font-size: 18px;
+        }
+        .spin-btn {
+            width: 100%; margin-top: 15px; padding: 15px; border-radius: 8px; border: none;
+            background: var(--neon-pink); color: white; font-weight: 900; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+        .spin-btn:hover { background: #d600d6; box-shadow: 0 0 20px rgba(255, 0, 255, 0.4); }
+
+        .stat-footer { font-size: 10px; color: #555; text-align: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<!-- MENÚ DE PAUSA -->
+<div id="pause-menu">
+    <h1 style="letter-spacing: 15px; color: white; text-shadow: 0 0 10px var(--neon-blue);">PAUSED</h1>
+    <button class="menu-btn" onclick="togglePause()">RESUME</button>
+    <button class="menu-btn btn-exit" onclick="window.location.href='index.html'">EXIT</button>
+</div>
+
+<div class="game-card">
+    <div class="header">
+        <div class="balance-label">AVAILABLE CREDIT</div>
+        <div class="balance-amount" id="money-display">$0</div>
+        <div style="font-size: 11px; color: #888;">Flow Rate: +$<span id="income-display">1</span>/click</div>
+    </div>
+
+    <div class="nav">
+        <button class="nav-btn active" onclick="tab(event, 'play')">Terminal</button>
+        <button class="nav-btn" onclick="tab(event, 'market')">Upgrades</button>
+        <button class="nav-btn" onclick="tab(event, 'casino')">High Roller</button>
+    </div>
+
+    <div class="content">
+        <!-- VISTA PLAY -->
+        <div id="play" class="view active-view">
+            <div class="clicker-container">
+                <button class="neon-btn" onclick="mine()">CASH IN</button>
+            </div>
+            <div style="margin-top: 40px; font-size: 12px; color: #444; text-align: center;">
+                SECURE CONNECTION: <span style="color:var(--neon-green)">ENCRYPTED</span><br>
+                <small style="color:#666; margin-top:5px; display:block;">PRESS [ESC] TO PAUSE</small>
+            </div>
+        </div>
+
+        <!-- VISTA MARKET -->
+        <div id="market" class="view">
+            <div id="market-list"></div>
+        </div>
+
+        <!-- VISTA CASINO -->
+        <div id="casino" class="view">
+            <h3 style="text-align: center; color: var(--neon-pink); letter-spacing: 3px;">DOUBLE OR NOTHING</h3>
+            <div class="slot-machine">
+                <div class="slot" id="s1">7</div>
+                <div class="slot" id="s2">7</div>
+                <div class="slot" id="s3">7</div>
+            </div>
+            <input type="number" id="bet-input" class="casino-input" placeholder="WAGER AMOUNT">
+            <button class="spin-btn" onclick="gamble()">SPIN THE WHEEL</button>
+        </div>
+    </div>
+    
+    <div class="stat-footer">SESSION ID: <span id="session-id"></span></div>
+</div>
+
+<script>
+    let game = {
+        money: 0,
+        income: 1,
+        upgrades: [
+            { id: 0, name: "Fast Processor", cost: 20, boost: 2, level: 0 },
+            { id: 1, name: "Neural Uplink", cost: 150, boost: 8, level: 0 },
+            { id: 2, name: "Quantum Rig", cost: 1200, boost: 45, level: 0 },
+            { id: 3, name: "Global Mainframe", cost: 8500, boost: 200, level: 0 }
+        ]
+    };
+
+    let isPaused = false;
+
+    function togglePause() {
+        isPaused = !isPaused;
+        document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none';
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === "Escape") togglePause();
+    });
+
+    function load() {
+        const saved = localStorage.getItem('neon_fortune_save');
+        if (saved) {
+            const decoded = JSON.parse(saved);
+            game.money = decoded.money;
+            game.income = decoded.income;
+            decoded.upgrades.forEach((up, i) => {
+                game.upgrades[i].level = up.level;
+                game.upgrades[i].cost = up.cost;
+            });
+        }
+        document.getElementById('session-id').innerText = Math.random().toString(36).substring(7).toUpperCase();
+        updateUI();
+    }
+
+    function save() {
+        localStorage.setItem('neon_fortune_save', JSON.stringify(game));
+    }
+
+    function updateUI() {
+        document.getElementById('money-display').innerText = "$" + Math.floor(game.money).toLocaleString();
+        document.getElementById('income-display').innerText = game.income.toLocaleString();
+        renderMarket();
+    }
+
+    function tab(e, name) {
+        if(isPaused) return;
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active-view'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(name).classList.add('active-view');
+        e.currentTarget.classList.add('active');
+    }
+
+    function mine() {
+        if(isPaused) return;
+        game.money += game.income;
+        updateUI();
+        save();
+    }
+
+    function renderMarket() {
+        const container = document.getElementById('market-list');
+        container.innerHTML = '';
+        game.upgrades.forEach(up => {
+            const card = document.createElement('div');
+            card.className = `upgrade-card ${game.money < up.cost ? 'disabled' : ''}`;
+            card.innerHTML = `
+                <div class="up-info">
+                    <b>${up.name} [Lv.${up.level}]</b>
+                    <small>Increases flow by +$${up.boost}</small>
+                </div>
+                <div class="up-price">$${Math.floor(up.cost).toLocaleString()}</div>
+            `;
+            card.onclick = () => buyUpgrade(up.id);
+            container.appendChild(card);
+        });
+    }
+
+    function buyUpgrade(id) {
+        if(isPaused) return;
+        let up = game.upgrades[id];
+        if (game.money >= up.cost) {
+            game.money -= up.cost;
+            game.income += up.boost;
+            up.level++;
+            up.cost = Math.floor(up.cost * 1.4);
+            updateUI();
+            save();
+        }
+    }
+
+    function gamble() {
+        if(isPaused) return;
+        const bet = parseInt(document.getElementById('bet-input').value);
+        if (isNaN(bet) || bet <= 0 || bet > game.money) {
+            alert("CREDITS REJECTED: Invalid Wager");
+            return;
+        }
+
+        game.money -= bet;
+        const s1 = Math.floor(Math.random() * 7);
+        const s2 = Math.floor(Math.random() * 7);
+        const s3 = Math.floor(Math.random() * 7);
+
+        document.getElementById('s1').innerText = s1;
+        document.getElementById('s2').innerText = s2;
+        document.getElementById('s3').innerText = s3;
+
+        if (s1 === s2 && s2 === s3) {
+            const win = bet * 10;
+            game.money += win;
+            alert("!!! JACKPOT !!!\nYou won $" + win.toLocaleString());
+        } else if (s1 === s2 || s2 === s3 || s1 === s3) {
+            game.money += bet * 2;
+        }
+
+        updateUI();
+        save();
+    }
+
+    window.onload = load;
+</script>
+
+</body>
+</html>

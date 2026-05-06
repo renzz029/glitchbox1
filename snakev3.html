@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LED-SNAKE 029 | GlitchBox Session</title>
+    <style>
+        :root {
+            --neon-purple: #bc13fe;
+            --neon-cyan: #00f3ff;
+            --neon-gold: #f1c40f;
+            --bg-obsidian: #050505;
+        }
+
+        body {
+            background-color: var(--bg-obsidian);
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            /* Per defecte el traiem, el controlarem per JS */
+            cursor: none;
+        }
+
+        .ui-header { 
+            margin-bottom: 20px; 
+            display: flex;
+            gap: 50px;
+            align-items: baseline;
+            letter-spacing: 2px;
+        }
+        .score-display { 
+            font-size: 32px; 
+            font-weight: 800; 
+            text-shadow: 0 0 15px var(--neon-purple); 
+        }
+
+        canvas {
+            border: 2px solid var(--neon-purple);
+            background-color: #020205;
+            box-shadow: 0 0 40px rgba(188, 19, 254, 0.3);
+        }
+
+        #pauseMenu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(5, 5, 5, 0.98);
+            padding: 50px;
+            border: 1px solid var(--neon-purple);
+            text-align: center;
+            box-shadow: 0 0 100px rgba(188, 19, 254, 0.5);
+            z-index: 10;
+            border-radius: 4px;
+            min-width: 320px;
+            /* Crucial: punter visible al menú */
+            cursor: default;
+        }
+
+        #countdown {
+            display: none;
+            position: absolute;
+            font-size: 150px;
+            font-weight: 900;
+            color: var(--neon-gold);
+            text-shadow: 0 0 30px var(--neon-gold);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .menu-btns { display: flex; flex-direction: column; gap: 15px; margin-top: 30px; }
+        
+        button {
+            background: transparent;
+            border: 1px solid var(--neon-purple);
+            color: var(--neon-purple);
+            padding: 15px 40px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            letter-spacing: 3px;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: var(--neon-purple);
+            color: white;
+            box-shadow: 0 0 30px var(--neon-purple);
+        }
+
+        .btn-exit { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+        .btn-exit:hover { background: var(--neon-cyan); color: #000; box-shadow: 0 0 30px var(--neon-cyan); }
+    </style>
+</head>
+<body>
+
+    <div class="ui-header">
+        <div class="score-display">SCORE: <span id="scoreVal" style="color:var(--neon-gold)">0</span></div>
+        <div style="color: rgba(255,255,255,0.3); font-size: 12px;">[ESC] PAUSE | [SHIFT] TURBO</div>
+    </div>
+    
+    <div id="countdown">3</div>
+
+    <div id="pauseMenu">
+        <h1 style="margin:0; font-size: 50px; letter-spacing: 5px;">PAUSED</h1>
+        <div style="margin: 20px 0; font-size: 20px; color: var(--neon-gold); font-weight: bold;">
+            CURRENT SCORE: <span id="pauseScore">0</span>
+        </div>
+        <div class="menu-btns">
+            <button onclick="resumeGame()">RESUME SESSION</button>
+            <button class="btn-exit" onclick="window.location.href='index.html'">RETURN TO HUB</button>
+        </div>
+    </div>
+
+    <canvas id="jocCanvas" width="600" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById("jocCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("scoreVal");
+        const pauseScoreElement = document.getElementById("pauseScore");
+        const pauseMenu = document.getElementById("pauseMenu");
+        const countdownElement = document.getElementById("countdown");
+
+        let score = 0;
+        let baseSpeed = 3; 
+        let currentSpeed = baseSpeed;
+        let x = 300; let y = 200;
+        let dx = 1; let dy = 0;
+        let snake = [];
+        let snakeLength = 30;
+        let isPaused = false;
+        let inCountdown = false;
+        
+        let frog = { x: 0, y: 0, gold: false };
+        const keys = {};
+
+        window.addEventListener("keydown", e => {
+            const key = e.key.toLowerCase();
+            keys[key] = true;
+            if (e.key === "Escape") togglePause();
+            if (isPaused || inCountdown) return;
+            if ((key === 'w' || e.key === 'ArrowUp') && dy === 0) { dx = 0; dy = -1; }
+            if ((key === 's' || e.key === 'ArrowDown') && dy === 0) { dx = 0; dy = 1; }
+            if ((key === 'a' || e.key === 'ArrowLeft') && dx === 0) { dx = -1; dy = 0; }
+            if ((key === 'd' || e.key === 'ArrowRight') && dx === 0) { dx = 1; dy = 0; }
+        });
+
+        window.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
+
+        function togglePause() {
+            if (inCountdown) return;
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseScoreElement.innerText = score;
+                pauseMenu.style.display = "block";
+                document.body.style.cursor = "default"; // MOSTRAR RATOLÍ EN PAUSA
+            } else {
+                pauseMenu.style.display = "none";
+                document.body.style.cursor = "none";    // OCULTAR RATOLÍ JUGANT
+            }
+        }
+
+        function resumeGame() {
+            pauseMenu.style.display = "none";
+            startCountdown();
+        }
+
+        function startCountdown() {
+            inCountdown = true;
+            countdownElement.style.display = "block";
+            document.body.style.cursor = "none";
+            let count = 3;
+            countdownElement.innerText = count;
+            let timer = setInterval(() => {
+                count--;
+                if (count > 0) countdownElement.innerText = count;
+                else {
+                    clearInterval(timer);
+                    countdownElement.style.display = "none";
+                    inCountdown = false;
+                    isPaused = false;
+                }
+            }, 700);
+        }
+
+        function spawnFrog() {
+            frog.x = Math.floor(Math.random() * (canvas.width / 20 - 2) + 1) * 20 + 10;
+            frog.y = Math.floor(Math.random() * (canvas.height / 20 - 2) + 1) * 20 + 10;
+            frog.gold = Math.random() < 0.15;
+        }
+
+        function update() {
+            if (isPaused || inCountdown) return;
+            let multiplier = keys["shift"] ? 2.2 : 1;
+            let step = currentSpeed * multiplier;
+            x += dx * step; y += dy * step;
+            if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) return reset();
+            if (snake.length > 40) {
+                for (let i = 25; i < snake.length; i++) {
+                    let d = Math.hypot(x - snake[i].x, y - snake[i].y);
+                    if (d < 6) return reset();
+                }
+            }
+            snake.unshift({x, y});
+            if (snake.length > snakeLength) snake.pop();
+            let dist = Math.hypot(x - frog.x, y - frog.y);
+            if (dist < 18) {
+                score += frog.gold ? 5 : 1;
+                snakeLength += frog.gold ? 35 : 15;
+                currentSpeed += 0.1; 
+                scoreElement.innerText = score;
+                spawnFrog();
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = "#020205";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Quadrícula
+            ctx.strokeStyle = "rgba(188, 19, 254, 0.15)";
+            ctx.lineWidth = 1;
+            for(let i=0; i<=canvas.width; i+=20) {
+                ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke();
+            }
+            for(let i=0; i<=canvas.height; i+=20) {
+                ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke();
+            }
+
+            // Rana
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = frog.gold ? "#f1c40f" : "#2ecc71";
+            ctx.font = "24px Arial";
+            ctx.fillText(frog.gold ? "👑" : "🐸", frog.x - 12, frog.y + 9);
+
+            // Serp
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#bc13fe";
+            snake.forEach((segment, i) => {
+                let opacity = 1 - (i / snake.length);
+                if (keys["shift"] && i % 2 === 0) ctx.fillStyle = "#fff";
+                else ctx.fillStyle = `rgba(188, 19, 254, ${opacity})`;
+                ctx.beginPath();
+                let size = (i === 0) ? 12 : 8;
+                ctx.arc(segment.x, segment.y, size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.shadowBlur = 0;
+        }
+
+        function reset() {
+            document.body.style.cursor = "default"; // MOSTRAR RATOLÍ PER L'ALERT
+            alert("SYSTEM COLLISION\nSCORE ARCHIVED: " + score);
+            score = 0;
+            currentSpeed = baseSpeed;
+            scoreElement.innerText = score;
+            snakeLength = 30; snake = [];
+            x = 300; y = 200; dx = 1; dy = 0;
+            spawnFrog();
+            document.body.style.cursor = "none"; // TORNAR A OCULTAR
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        spawnFrog();
+        loop();
+    </script>
+</body>
+</html>
